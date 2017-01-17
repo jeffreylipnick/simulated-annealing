@@ -1,4 +1,14 @@
-# Jeffrey Lipnick
+''' 
+Jeffrey Lipnick
+Simulated Annealing Project
+
+This project is designed to find a "good" solution to a political redistricting problem that has a functionally infinite solution set.  The input is a small matrix of voters (8x8 or 10x10) that each have a specific political affiliaton.  The voters are passed in as a command line argument and an example of the format can be seen in the accompanying smallState.txt or largeState.txt files.  For the purposes of this project, a "good" solution constitutes creating districts with the following properties:
+
+1. Similar numbers of voters for each political party per district.
+2. 8 districts of 8 voters for an 8x8 input or 10 districts of 10 voters for a 10x10 input.
+3. All the districts must be contiguous.
+
+'''
 
 import sys # use for file input
 import random # use for neighboring solution generation
@@ -6,6 +16,7 @@ import operator # use for neighboring solution generation
 import math
 import copy
 
+# Each voter is represented by a Node
 class Node():
 	def __init__(self, value, row, column):
 		self.value = value
@@ -30,6 +41,7 @@ class Node():
 				sys.stdout.write(", (" + str(node.row) + "," + str(node.column) + ")") 
 		print ""
 
+# each solution is represtented by a Solution object.  Each solution has a list of district objects.
 class Solution():
 	def __init__(self):
 		self.districts = []
@@ -67,8 +79,9 @@ class Solution():
 				Tie += 1
 		print "R: " + str(RMajor)
 		print "D: " + str(DMajor)
-		#print "Tie: " + str(Tie)
+		print "Tie: " + str(Tie)
 
+# each district has a number and the voters are stored in a vertices dictionary.
 class District():
 	def __init__(self, number):
 		self.number = number
@@ -79,6 +92,7 @@ class District():
 		if position not in self.vertices:
 			self.vertices[position] = node
 
+# When the voter matrix is read in, this function adds the adjacent nodes to the adjacent dictionary for every node. This is needed when testing solutions for contiguity by performing a depth-first search.
 def addAdjacency(matrix):
 	r1 = 0
 	while (r1 < len(matrix)):
@@ -131,23 +145,7 @@ def addAdjacency(matrix):
 			c1 += 1
 		r1 += 1
 
-# def initialSolution(matrix):
-# 	s = Solution()
-# 	n = len(matrix)
-# 	i = 0
-# 	while (i < n):
-# 		d = District(i)
-# 		s.districts.insert(i, d)
-# 		i += 1	
-# 	j = 0
-# 	while (j < n):
-# 		for node in matrix[j]:
-# 			node.district = j
-# 			position = str(node.row) + str(node.column)
-# 			s.districts[j].addVertex(position, node)
-# 		j += 1
-# 	return s
-
+# This function creates an initial solution before random solutions are generated.  This function could be improved by adding some randomiation into the inital soluton generation so that every solution set doesn't start with the same initial solution. 
 def initialSolution(matrix):
 	s = Solution()
 	n = len(matrix)
@@ -210,6 +208,7 @@ def initialSolution(matrix):
 					s.districts[9].addVertex(position, node)
 	return s
 
+# This function checks for contiguity of districts to ensure a valid solution.  It utilizes a depth-first search to check for contiguity.
 def validSolution(district):
 	for item, value in district.vertices.iteritems():
 		value.visited = False
@@ -220,10 +219,8 @@ def validSolution(district):
 		if (value.visited != True):
 			connected = False
 	if (connected == True):
-		#print "Connected Solution"
 		return True
 	else:
-		#print "Not Connected Solution"
 		return False
 
 def DFS(node):
@@ -235,6 +232,7 @@ def DFS(node):
 			if (adj.district == node.district):
 				DFS(adj)
 
+# Generates a neighboring solution for use in the simulated annealing algorithm.
 def neighboringSolution(solution):
 	complete = False
 	while not complete:
@@ -244,32 +242,26 @@ def neighboringSolution(solution):
 		district1 = sp.districts[districtNum]
 
 		node = random.choice(district1.vertices.values())
-		#print "Node (" + str(node.row) + "," + str(node.column) + ") randomly chosen from district " + str(district1.number)
 		adj = None
 		for key, value in node.adjacent.iteritems():
 			if (value.district != node.district):
 				adj = value
 				break
 		if (adj != None):
-			#print "Adjacent Node (" + str(adj.row) + "," + str(adj.column) + ") selected from district " + str(adj.district)
 			district2Number = adj.district
 			adj.district = node.district
 			adjPosition = str(adj.row) + str(adj.column)
 			district2 = sp.districts[district2Number]
 			district1.vertices[adjPosition] = adj
-			#print "Adjacent Node (" + str(adj.row) + "," + str(adj.column) + ") added to district " + str(adj.district)
 			district2.vertices.pop(adjPosition, None)
-			#print "Adjacent Node (" + str(adj.row) + "," + str(adj.column) + ") removed from district " + str(district2Number)
 
 			found = False
 			grabbed = None
 			j = 0
 			while not found and (j < 9):
 				option = random.choice(district2.vertices.values())
-				#print "option chosen"
 				i = 0
 				for key, value in option.adjacent.iteritems():
-					#print "for loop"
 					if (i < 9): # prevents being stuck in infinte loop with no viable adjacent nodes
 						if (value.district == node.district and value != adj):
 							grabbed = value
@@ -280,10 +272,8 @@ def neighboringSolution(solution):
 						break
 				j += 1
 			if (found == True):
-				#print "Node (" + str(grabbed.row) + "," + str(grabbed.column) + ") grabbed"
 				position2 = str(grabbed.row) + str(grabbed.column)
 				grabbed.district = district2Number
-				#print "Grabbed's district set to: " + str(district2Number)
 				district2.vertices[position2] = grabbed
 				district1.vertices.pop(position2, None)
 
@@ -294,6 +284,7 @@ def neighboringSolution(solution):
 					complete = True
 	return sp
 
+# Evaluates the fitness of a solution. The fitness here is defined as evenness between the number of voters in each political party for a district.
 def fitness(s):
 	f = 0.0
 	counter = 0.0
@@ -311,6 +302,7 @@ def fitness(s):
 	return f
 
 def simulatedAnnealing(solution):
+	# The number of search states can be adjusted by tweaking these initial parameters
 	s = solution
 	T = 1.0
 	k = 50
@@ -322,13 +314,10 @@ def simulatedAnnealing(solution):
 			sp = neighboringSolution(s)
 			deltaE = fitness(sp) - fitness(s)
 			if (deltaE < 0):
-				#print "Better solution found"
 				s = sp
 			else:
 				p = math.exp( (-deltaE - 1) / (k*T) )
-				#print "Probabilty: " + str(p)
 				if (random.random() < p):
-					#print "Worse solution accepted by probability"
 					s = sp		
 			s.searchStates += 1	
 			i+=1
@@ -387,32 +376,48 @@ def main():
 	print "*************************************\n"
 
 	print "*************************************"
-	print "Algorithm applied: SA"
-	print "*************************************\n"
-
-	print "*************************************"
 	print "Number of search states explored: " + str(s.searchStates)
 	print "*************************************\n"
 
-	# Print out ending districts
-	# fmatrix = []
-	# for district in s.districts:
-	# 	for key, node in district.vertices.iteritems():
-	# 		fmatrix.append(node)
-	# i = 0
-	# while (i < 8):
-	# 	j = 0
-	# 	while (j < 8):
-	# 		pos = str(i) + str(j)
-	# 		for item in fmatrix:
-	# 			itemPos = str(item.row) + str(item.column)
-	# 			if (itemPos == pos):
-	# 				print str(item.district) + " ",
-	# 				break
-	# 		if (j == 7):
-	# 			print ""
-	# 		j += 1
-	# 	i += 1
+	print "*************************************"
+	print "Visualization of final districts:"
+	print "*************************************\n"
+	fmatrix = []
+	for district in s.districts:
+		for key, node in district.vertices.iteritems():
+			fmatrix.append(node)
+	if (len(fmatrix) == 64): # Print 8x8
+		i = 0
+		while (i < 8):
+			j = 0
+			while (j < 8):
+				pos = str(i) + str(j)
+				for item in fmatrix:
+					itemPos = str(item.row) + str(item.column)
+					if (itemPos == pos):
+						print str(item.district) + " ",
+						break
+				if (j == 7):
+					print ""
+				j += 1
+			i += 1
+		print ""
+	elif (len(fmatrix) == 100): # Print 10x10
+		i = 0
+		while (i < 10):
+			j = 0
+			while (j < 10):
+				pos = str(i) + str(j)
+				for item in fmatrix:
+					itemPos = str(item.row) + str(item.column)
+					if (itemPos == pos):
+						print str(item.district) + " ",
+						break
+				if (j == 9):
+					print ""
+				j += 1
+			i += 1
+		print ""
 
 if __name__ == '__main__':
     main()
